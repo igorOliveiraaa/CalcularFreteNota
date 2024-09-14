@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Frete</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        input {
+            margin-top: 5px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #resultado {
+            margin-top: 20px;
+        }
+        .resultado-item {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #e9ecef;
+        }
+        .resultado-item span {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Calculadora de Frete</h1>
+        <form id="frete-form">
+            <label for="xmlFile">Importar Nota Fiscal (XML):</label>
+            <input type="file" id="xmlFile" accept=".xml" required>
+            
+            <label for="valorFrete">Valor Total do Frete (R$):</label>
+            <input type="number" id="valorFrete" step="0.01" required>
+            
+            <button type="submit">Calcular Valores com Frete</button>
+        </form>
+
+        <div id="resultado">
+            <!-- Resultados serão exibidos aqui -->
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('frete-form');
+            const resultadoDiv = document.getElementById('resultado');
+            
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                
+                const fileInput = document.getElementById('xmlFile');
+                const valorFrete = parseFloat(document.getElementById('valorFrete').value);
+                
+                if (fileInput.files.length === 0) {
+                    alert('Por favor, selecione um arquivo XML.');
+                    return;
+                }
+                
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    const xmlContent = e.target.result;
+                    
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+                    const produtos = xmlDoc.getElementsByTagName('det');
+                    const valoresProdutos = [];
+                    let valorTotalProdutos = 0;
+
+                    for (let i = 0; i < produtos.length; i++) {
+                        const valorTotal = parseFloat(produtos[i].getElementsByTagName('vProd')[0].textContent);
+                        const quantidade = parseFloat(produtos[i].getElementsByTagName('qCom')[0].textContent);
+                        const descricao = produtos[i].getElementsByTagName('xProd')[0].textContent;
+
+                        // Extração de imposto IPI
+                        const ipi = parseFloat(produtos[i].getElementsByTagName('vIPI')[0]?.textContent || 0);
+
+                        const valorUnitario = valorTotal / quantidade;
+
+                        if (!isNaN(valorTotal) && !isNaN(quantidade) && quantidade > 0) {
+                            valoresProdutos.push({
+                                valorTotal: valorTotal,
+                                quantidade: quantidade,
+                                valorUnitario: valorUnitario,
+                                descricao: descricao,
+                                ipi: ipi
+                            });
+                            valorTotalProdutos += valorTotal;
+                        }
+                    }
+
+                    resultadoDiv.innerHTML = '';
+                    
+                    valoresProdutos.forEach((produto, index) => {
+                        const { valorTotal, quantidade, valorUnitario, descricao, ipi } = produto;
+                        const freteProduto = (valorTotal / valorTotalProdutos) * valorFrete;
+                        const precoFinal = valorTotal + freteProduto + ipi;
+                        const valorUnitarioComFrete = precoFinal / quantidade;
+
+                        const resultadoItem = document.createElement('div');
+                        resultadoItem.className = 'resultado-item';
+                        resultadoItem.innerHTML = `
+                            <span><strong>Produto ${index + 1}:</strong> ${descricao}</span>
+                            <span><strong>Valor Unitário Original:</strong> R$ ${valorUnitario.toFixed(2)}</span>
+                            <span><strong>Valor Unitário com Frete e IPI:</strong> R$ ${valorUnitarioComFrete.toFixed(2)}</span>
+                            <span><strong>Quantidade:</strong> ${quantidade}</span>
+                            <span><strong>Valor Total:</strong> R$ ${valorTotal.toFixed(2)}</span>
+                            <span><strong>Valor Adicional de Frete:</strong> R$ ${freteProduto.toFixed(2)}</span>
+                            <span><strong>IPI:</strong> R$ ${ipi.toFixed(2)}</span>
+                            <span><strong>Valor Final:</strong> R$ ${precoFinal.toFixed(2)}</span>
+                        `;
+                        resultadoDiv.appendChild(resultadoItem);
+                    });
+
+                    const resumoNota = document.createElement('div');
+                    resumoNota.className = 'resultado-item';
+                    resumoNota.innerHTML = `
+                        <span><strong>Resumo Final:</strong></span>
+                        <span>Valor Total dos Produtos (sem impostos): R$ ${valorTotalProdutos.toFixed(2)}</span>
+                        <span>Valor Total do Frete Adicional: R$ ${valorFrete.toFixed(2)}</span>
+                    `;
+                    resultadoDiv.appendChild(resumoNota);
+                };
+                
+                reader.readAsText(file);
+            });
+        });
+    </script>
+</body>
+</html>
